@@ -134,3 +134,7 @@ void __attribute__((noinline)) dtor() {
 // tab-width: 4 //
 // compile-command: "gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -fno-reorder-functions -DPIN -DAlgorithm=MCS_atomics_wo Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0" //
 // End: //
+
+
+// to compare against mcs.c
+// for alg in MCS_atomics_wo MCS ; do gcc -Wall -Wextra -std=gnu11 -O3 -DNDEBUG -DPIN -DAlgorithm=$alg Harness.c -lpthread -lm -D`hostname` -DCFMT -DCNT=0 && for n in 1 2 4 8 16 32 ; do ./a.out $n 10 ; done ; done
