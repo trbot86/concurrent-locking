@@ -35,7 +35,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 	// no ordering needed here because of data dependence (unless on alpha dec... :-))
     if ( SLOWPATH( prev == NULL ) ) return;						// no one on list ?
 	__atomic_store_n(&prev->next, node, __ATOMIC_RELAXED);
-	// StLd compiler-only fence needed for progress? (no convenient fence for this exists in C++ spec...)
+	// StLd compiler-only fence needed for progress? (no convenient fence for this exists in C++ spec... normally i'd use an empty volatile asm :::"memory" block...)
 
 	while ( __atomic_load_n(&node->spin, __ATOMIC_RELAXED) == true ) Pause(); // busy wait on my spin variable
 	__atomic_thread_fence(__ATOMIC_ACQUIRE); 					// prevent cs RW from being reordered with R above (spinning R happens before CS RW)
@@ -47,7 +47,7 @@ inline void mcs_lock( MCS_lock * lock, MCS_node * node ) {
 
 	// reasoning about insufficiency of ordering when using __ATOMIC_RELAXED for the xchg instead:
 	//		CS  <(acquire fence) spinning
-	//			<(control depencence for compiler reordering) return if prev null [but nothing for processor reordering!]
+	//			<(control dependence for compiler reordering) return if prev null [but nothing for processor reordering!]
 	//			<(data dependence on prev) node publication [can speculation break this?]
 	//		    <(release fence) initialization
 
@@ -66,16 +66,16 @@ inline void mcs_unlock( MCS_lock * lock, MCS_node * node ) {
 		// processor ordering: similar argument that speculation is fine---a bounded number of these loads can be moved before the cas, which is fine if we don't actually return.
 		while ( __atomic_load_n(&node->next, __ATOMIC_RELAXED) == NULL ) Pause(); // busy wait until my node is modified
 	} // if
-	// compiler ordering: after load node->next by control dependence (could need to return in if-block)
-	// processor ordering: similar argument to cas above
+	// compiler ordering: this write is after load node->next by control dependence (could need to return in if-block)
+	// processor ordering: similar to speculation argument above
 	node->next->spin = false;									// stop their busy wait
 
 	// note: i think some reads of node->next can still technically float up into the CS...
 	//       but this is fine, since
 	//		 - if we incorrectly read node->next == NULL as a result,
-	//       	we will fail our CAS (which can't move up) and wait until it's null.
-	//		 - and we can't incorrectly read node->next != NULL as a result
-	//          (node->next's change to non-null is monotonic until we start our next CS entry attempt)
+	//         we will fail our CAS (which can't move up) and wait until it's null.
+	//		 - and we can't incorrectly read node->next != NULL as a result, since
+	//         node->next's change to non-null is monotonic until we start our next CS entry attempt
 
 } // mcs_unlock
 
